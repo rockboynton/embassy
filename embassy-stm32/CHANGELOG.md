@@ -19,6 +19,7 @@ I2C:
 
 USART:
 - fix: stm32/usart: `BufferedUartTx::flush` could return before the last bytes left the UART when a write wrapped around the end of the TX buffer. The TC interrupt now reports done only when the TX buffer is empty, and every write pends the interrupt.
+- fix: stm32/usart: on usart_v4, `tx_fifo_threshold` and `rx_fifo_threshold` are now the `TxFifoThreshold` and `RxFifoThreshold` enums, one variant for each TXFTCFG/RXFTCFG level. Before, they were byte counts written to the register as is, so the default TX threshold of 6 selected a reserved code and RX 4 selected 7/8 full. The defaults are now 3/4 and 1/2. With `eager_reads` set, `BufferedUartRx` now takes an interrupt on every received word on these chips, instead of a FIFO threshold that assumed an 8-word FIFO.
 
 Flash:
 - fix: stm32/flash: preserve F2/F4/F7/H7 PSIZE during programming cleanup so subsequent erases retain x32 parallelism.

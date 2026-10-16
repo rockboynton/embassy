@@ -124,6 +124,48 @@ pub enum StopBits {
     STOP1P5,
 }
 
+#[cfg(usart_v4)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
+/// How much of the TX FIFO must be free for the buffered irq handler to run, as a fraction of the FIFO depth. The
+/// depth differs between chips, so check the reference manual for yours. Each value is its TXFTCFG code.
+pub enum TxFifoThreshold {
+    /// 1/8 of the TX FIFO free
+    Eighth = 0,
+    /// 1/4 of the TX FIFO free
+    Quarter = 1,
+    /// 1/2 of the TX FIFO free
+    Half = 2,
+    /// 3/4 of the TX FIFO free
+    ThreeQuarters = 3,
+    /// 7/8 of the TX FIFO free
+    SevenEighths = 4,
+    /// TX FIFO empty
+    Empty = 5,
+}
+
+#[cfg(usart_v4)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
+/// How much of the RX FIFO must be filled for the buffered irq handler to run, as a fraction of the FIFO depth. The
+/// depth differs between chips, so check the reference manual for yours. Each value is its RXFTCFG code.
+pub enum RxFifoThreshold {
+    /// 1/8 of the RX FIFO filled
+    Eighth = 0,
+    /// 1/4 of the RX FIFO filled
+    Quarter = 1,
+    /// 1/2 of the RX FIFO filled
+    Half = 2,
+    /// 3/4 of the RX FIFO filled
+    ThreeQuarters = 3,
+    /// 7/8 of the RX FIFO filled
+    SevenEighths = 4,
+    /// RX FIFO full
+    Full = 5,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Enables or disables receiver so written data are read back in half-duplex mode
@@ -248,9 +290,9 @@ pub struct Config {
     ///
     /// If `Some(n)` then such reads are also woken/return as soon as at least `n` words are
     /// available in the buffer, in addition to waking/returning when the conditions described
-    /// above are met. `Some(0)` is treated as `None`. Setting this for `RingBufferedUartRx`
-    /// will trigger an interrupt for every received word to check the buffer level, which may
-    /// impact performance at high data rates.
+    /// above are met. `Some(0)` is treated as `None`. Setting this for `RingBufferedUartRx`,
+    /// or for `BufferedUartRx` on chips with a USART FIFO, will trigger an interrupt for every
+    /// received word to check the buffer level, which may impact performance at high data rates.
     ///
     /// Has no effect on plain `Uart` or `UartRx` reads, which are specified to either
     /// return a single word, a full buffer, or after line idle.
@@ -308,12 +350,14 @@ pub struct Config {
     pub de_deassertion_time: u8,
 
     #[cfg(usart_v4)]
-    /// Transmit FIFO thereshold: number of bytes that must be free for the buffered irq handler to run.
-    pub tx_fifo_threshold: u8,
+    /// Transmit FIFO threshold: how much of the TX FIFO must be free for the buffered irq handler to run.
+    pub tx_fifo_threshold: TxFifoThreshold,
 
     #[cfg(usart_v4)]
-    /// Receive FIFO thereshold: number of bytes that must be available for the buffered irq handler to run.
-    pub rx_fifo_threshold: u8,
+    /// Receive FIFO threshold: how much of the RX FIFO must be filled for the buffered irq handler to run.
+    ///
+    /// With `eager_reads` set, the handler also runs on every received word, so this threshold no longer delays reads.
+    pub rx_fifo_threshold: RxFifoThreshold,
 
     // private: set by new_half_duplex, not by the user.
     duplex: Duplex,
@@ -388,9 +432,9 @@ impl Default for Config {
             #[cfg(not(any(usart_v1, usart_v2)))]
             de_deassertion_time: 0,
             #[cfg(usart_v4)]
-            tx_fifo_threshold: 6,
+            tx_fifo_threshold: TxFifoThreshold::ThreeQuarters,
             #[cfg(usart_v4)]
-            rx_fifo_threshold: 4,
+            rx_fifo_threshold: RxFifoThreshold::Half,
             duplex: Duplex::Full,
         }
     }
